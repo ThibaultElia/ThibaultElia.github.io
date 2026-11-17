@@ -53,7 +53,9 @@ header{display:flex;align-items:center;gap:14px;min-width:0}
 .chip[aria-pressed="true"] .st i{opacity:.3}
 
 .stage{position:relative;flex:1;min-height:240px;border-radius:16px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
-#hw{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:manipulation}
+#hw{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#hw.dragging{cursor:grabbing}
+.scrollhint{position:absolute;top:10px;right:16px;pointer-events:none;font:600 12px/1 var(--f-text);color:var(--muted);background:rgba(12,15,20,.7);border:1px solid var(--line);border-radius:999px;padding:6px 10px;transition:opacity .3s}
 .big{position:absolute;inset:0 0 25% 0;display:grid;place-items:center;pointer-events:none;font:800 min(26vh,150px)/1 var(--f-display);color:var(--amber);text-shadow:0 0 40px rgba(255,197,61,.35)}
 .pop{position:absolute;top:14px;left:0;right:0;text-align:center;pointer-events:none;font:700 18px/1 var(--f-display);opacity:0;transition:opacity .25s}
 .pop.on{opacity:1}
@@ -150,6 +152,7 @@ header{display:flex;align-items:center;gap:14px;min-width:0}
     <canvas id="hw" aria-label="Notes qui tombent sur le clavier"></canvas>
     <div class="big" id="big"></div>
     <div class="pop" id="pop"></div>
+    <div class="scrollhint" id="scrollHint">⇅ Glisse pour parcourir</div>
   </section>
 
   <section class="controls">
@@ -293,7 +296,7 @@ function loadSection(){
   S.notes=p[h].map((n,i)=>({beat:n.beat,dur:n.dur,m:n.m,hand:n.hand||h,i,st:'todo',slip:false}));
   S.pending=0;S.last=-1;S.clock=S.mode==='rhythm'?-4:-2;S.phase='idle';
   S.endBeat=Math.max(...S.notes.map(n=>n.beat+n.dur))+.5;
-  S.hits=0;S.perfect=0;S.errors=0;S.keyFx={};
+  S.hits=0;S.perfect=0;S.errors=0;S.keyFx={};S.seeked=false;S.countEnd=0;
   // clavier : juste les touches utiles, au moins deux octaves
   let lo=Math.min(...S.notes.flatMap(n=>n.m))-1,hi=Math.max(...S.notes.flatMap(n=>n.m))+1;
   while(countWhite(lo,hi)<15){lo--;if(countWhite(lo,hi)<15)hi++;}
@@ -496,8 +499,8 @@ function update(dt,ts){
       if(!t&&S.clock>S.endBeat)finish();
     }else{
       const before=S.clock;S.clock=S.c0+(ts/1000-S.t0)*bps(); // horloge réelle : pas de dérive si l'écran rame
-      if(S.clock<0)setBig(String(-Math.floor(S.clock)));
-      else if(before<0)setBig('');
+      if(S.clock<S.countEnd)setBig(String(Math.ceil(S.countEnd-S.clock-1e-6)));
+      else if(before<S.countEnd)setBig('');
       const spb=1/bps();
       for(const n of S.notes)if(n.st==='todo'&&(S.clock-n.beat)*spb>.3){n.st='miss';}
       if(S.clock>S.endBeat)finish();
@@ -511,7 +514,7 @@ function update(dt,ts){
     }
     for(const n of S.notes)if(n.st==='todo'&&n.beat<=S.clock){n.st='lit';n.hitAt=ts;S.last=n.i;}
     updateNoteCards();
-    if(S.clock>p.len+.3){demoStop();loadSection();}
+    if(S.clock>p.len+.3){demoStop();backToDemoStart();}
   }
 }
 
@@ -519,9 +522,12 @@ function update(dt,ts){
 function anchor(){S.c0=S.clock;S.t0=performance.now()/1000;}
 function play(){
   if(S.phase==='demo')demoStop();
-  if(S.phase==='end'||S.phase==='idle'&&S.notes.every(n=>n.st!=='todo'))loadSection();
+  if(S.phase==='end'||S.notes.every(n=>n.st!=='todo'))loadSection();
   if(ctx)ensureCtx();
-  if(S.phase==='idle'&&S.mode==='rhythm'){S.clock=-4;if(ctx)for(let k=0;k<4;k++)click(ctx.currentTime+.03+k/bps(),k===0);}
+  if(S.mode==='rhythm'&&(S.phase==='idle'||S.phase==='pause')){
+    S.countEnd=Math.max(0,S.clock);S.clock=S.countEnd-4;
+    if(ctx)for(let k=0;k<4;k++)click(ctx.currentTime+.03+k/bps(),k===0);
+  }
   anchor();S.phase='play';renderPlay();
 }
 function pause(){if(S.phase==='play'){S.phase='pause';setBig('');renderPlay();}}
@@ -530,11 +536,11 @@ function restart(){loadSection();}
 function finish(){
   if(S.phase!=='play')return;
   S.phase='end';renderPlay();setBig('');
-  const total=S.notes.length,good=S.mode==='wait'?S.perfect:S.hits,ratio=good/total;
+  const total=Math.max(1,S.notes.filter(n=>n.st!=='skip').length),good=S.mode==='wait'?S.perfect:S.hits,ratio=good/total;
   const stars=ratio>=.9?3:ratio>=.7?2:ratio>=.4?1:0;
-  const k=S.sec+'.'+effHand(),st=saved.stars[k]=saved.stars[k]||{};
-  st[S.mode]=Math.max(st[S.mode]||0,stars);save();renderChips();
-  $('endSec').textContent=PARTS[S.sec].name+' · '+(effHand()==='rh'?'main droite':'main gauche')+' · '+Math.round(S.speed*100)+' %';
+  if(!S.seeked){const k=S.sec+'.'+effHand(),st=saved.stars[k]=saved.stars[k]||{};st[S.mode]=Math.max(st[S.mode]||0,stars);save();renderChips();}
+  const from=S.seeked?' · depuis la mesure '+(Math.floor(S.seekFrom/4)+1):'';
+  $('endSec').textContent=PARTS[S.sec].name+' · '+(effHand()==='rh'?'main droite':'main gauche')+' · '+Math.round(S.speed*100)+' %'+from;
   $('endStars').innerHTML='★'.repeat(stars)+'<i>'+'★'.repeat(3-stars)+'</i>';
   $('endScore').innerHTML=(S.mode==='wait'?`${good} / ${total} notes du premier coup`:`${good} / ${total} notes en rythme`)+
     `<small>${stars===3?(S.mode==='wait'?'Prêt pour le mode « En rythme ».':'Essaie un peu plus vite.'):stars>=1?'Encore une fois, ça rentre.':'Ralentis un peu, ça va venir.'}</small>`;
@@ -550,16 +556,19 @@ function hideEnd(){$('endOv').hidden=true;}
 const demo={events:[],k:0,t0:0,c0:0};
 function demoStart(){
   ensureCtx();
-  if(S.phase==='demo'){demoStop();loadSection();return;}
-  loadSection();
+  if(S.phase==='demo'){demoStop();backToDemoStart();return;}
+  const from=(S.phase==='idle'||S.phase==='pause')&&S.seeked?Math.max(0,S.clock):0;
+  loadSection();if(from>0)seekTo(from);
   const p=PARTS[S.sec];
   demo.events=[...p.rh.map(n=>({...n,main:true})),...p.lh.map(n=>({...n,main:effHand()==='lh'}))]
     .sort((a,b)=>a.beat-b.beat);
   if(S.sec==='tout'){ // la liste « main droite » de Tout contient déjà l'intro : on ne la double pas
     const ids=new Set();demo.events=demo.events.filter(e=>{const key=e.beat+'|'+e.m.join();if(ids.has(key))return false;ids.add(key);return true;});
   }
-  demo.k=0;demo.c0=-1;demo.t0=ctx.currentTime+.05;S.clock=-1;S.phase='demo';renderPlay();
+  demo.from=from;demo.k=demo.events.findIndex(e=>e.beat>=from-.01);if(demo.k<0)demo.k=demo.events.length;
+  demo.c0=from-1;demo.t0=ctx.currentTime+.05;S.clock=demo.c0;S.phase='demo';renderPlay();
 }
+function backToDemoStart(){loadSection();if(demo.from>0)seekTo(demo.from);}
 function demoStop(){
   if(S.phase==='demo'){voices.forEach(v=>{try{v.stop();}catch(e){}});voices.clear();S.phase='idle';DET.mute=performance.now()+400;renderPlay();}
 }
@@ -612,6 +621,7 @@ function draw(ts){
       let fill,txt='#1b1404',stroke=null;
       if(n.st==='done'){fill='rgba(61,220,151,'+(1-age*.6)+')';txt='#06210f';}
       else if(n.st==='lit')fill='rgba(255,224,138,'+(1-age*.5)+')';
+      else if(n.st==='skip'){fill='rgba(255,197,61,.2)';txt='rgba(27,20,4,.55)';}
       else if(n.st==='miss'){fill='rgba(255,107,107,.16)';stroke='#ff6b6b';txt='#ff9a9a';}
       else fill=blk?'#e8a91f':'#ffc53d';
       if(isPend){const pulse=.5+.5*Math.sin(ts/170);C.shadowColor='rgba(255,224,138,.9)';C.shadowBlur=12+10*pulse;}
@@ -623,6 +633,10 @@ function draw(ts){
     });
   }
   C.restore();
+  // rail de position dans la partie
+  {const top=10,bot=g.hitY-10,len=S.endBeat+2,fr=Math.max(0,Math.min(1,(S.clock+2)/len)),th=Math.max(22,(bot-top)*Math.min(1,(g.hitY/g.ppb)/len));
+   const y=bot-th-(bot-top-th)*fr;C.fillStyle='rgba(174,183,196,.12)';rr(C,W-7,top,4,bot-top,2);C.fill();
+   C.fillStyle=drag.moved&&drag.id!==null?'#ffc53d':'rgba(174,183,196,.45)';rr(C,W-7,y,4,th,2);C.fill();}
   // ligne d'arrivée
   const lg=C.createLinearGradient(0,g.hitY-26,0,g.hitY);lg.addColorStop(0,'rgba(255,197,61,0)');lg.addColorStop(1,'rgba(255,197,61,.22)');
   C.fillStyle=lg;C.fillRect(0,g.hitY-26,W,26);
@@ -657,6 +671,51 @@ function drawKeyboard(g,ts){
   // démo : touches qui sonnent
   if(S.phase==='demo'){for(const n of S.notes)if(n.st==='lit'&&ts-n.hitAt<220)n.m.forEach(m=>{const x=g.keyX(m),w=g.keyW(m);C.fillStyle='rgba(255,197,61,.55)';rr(C,x+1,top,w-2,isBlack(m)?kh*.62:kh-2,4);C.fill();});}
 }
+
+/* ================= Parcourir la partition ================= */
+function clampClock(b){return Math.max(-2,Math.min(S.endBeat-.5,b));}
+// Repart de la position b : les notes d'avant sont mises de côté, celles d'après sont à jouer.
+function seekTo(b,snap){
+  b=clampClock(b);
+  if(snap){let best=null,bd=1.01;for(const n of S.notes){const d=Math.abs(n.beat-b);if(d<bd){bd=d;best=n;}}if(best)b=best.beat;}
+  if(b<=0.01&&!snap){b=Math.min(b,0);}
+  S.clock=b;
+  S.notes.forEach(n=>{n.st=n.beat<b-.01?'skip':'todo';n.slip=false;n.hitAt=0;});
+  S.pending=S.notes.findIndex(n=>n.st==='todo');if(S.pending<0)S.pending=S.notes.length;
+  S.last=-1;S.hits=0;S.perfect=0;S.errors=0;S.keyFx={};DET.attempt=null;
+  S.seeked=b>.01;S.seekFrom=Math.max(0,b);S.countEnd=0;
+  if(S.phase!=='pause')S.phase='idle';
+  setBig('');cardKey='';updateNoteCards(true);renderPlay();
+}
+// Glisser au doigt ou à la souris (la partition suit le doigt), molette, flèches haut/bas.
+const drag={id:null,y0:0,c0:0,moved:false};
+function stopForScroll(){if(S.phase==='play')pause();else if(S.phase==='demo'){demoStop();}}
+cv.addEventListener('pointerdown',e=>{
+  if(S.phase==='end')return;
+  drag.id=e.pointerId;drag.y0=e.clientY;drag.c0=S.clock;drag.moved=false;
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+});
+cv.addEventListener('pointermove',e=>{
+  if(drag.id!==e.pointerId)return;
+  const dy=e.clientY-drag.y0;
+  if(!drag.moved&&Math.abs(dy)<6)return;
+  if(!drag.moved){drag.moved=true;stopForScroll();drag.c0=S.clock;drag.y0=e.clientY;cv.classList.add('dragging');return;}
+  S.clock=clampClock(drag.c0+dy/geo().ppb);
+});
+function endDrag(e){
+  if(drag.id!==e.pointerId)return;
+  drag.id=null;cv.classList.remove('dragging');
+  if(drag.moved)seekTo(S.clock,true);else manualHit();
+}
+cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+let wheelT=0;
+cv.addEventListener('wheel',e=>{
+  if(S.phase==='end')return;
+  e.preventDefault();stopForScroll();
+  const px=e.deltaMode===1?e.deltaY*16:e.deltaMode===2?e.deltaY*H:e.deltaY;
+  S.clock=clampClock(S.clock-px/geo().ppb);
+  clearTimeout(wheelT);wheelT=setTimeout(()=>seekTo(S.clock,true),180);
+},{passive:false});
 
 /* ================= Cartes ================= */
 function currentNote(){
@@ -710,6 +769,7 @@ const IC={
 };
 function renderPlay(){
   const playing=S.phase==='play';
+  $('scrollHint').style.opacity=(S.phase==='idle'||S.phase==='pause')?'1':'0';
   $('playIc').innerHTML=playing?IC.pause:IC.play;
   $('playTx').textContent=playing?'Pause':(S.phase==='pause'?'Reprendre':'Jouer');
   $('listenBtn').innerHTML=(S.phase==='demo'?IC.stop+'Arrêter':IC.ear+'Écouter');
@@ -757,13 +817,13 @@ $('endNext').addEventListener('click',()=>{const i=SECTION_IDS.indexOf(S.sec);S.
 function manualHit(){if(!S.manual||S.phase!=='play')return;const ts=performance.now();
   if(S.mode==='wait'){if(S.notes[S.pending])accept(S.pending,ts);}
   else{const n=S.notes[nextTodo()];if(n)resolveAttempt({clock:S.clock},n.m[0],ts);}}
-cv.addEventListener('pointerdown',manualHit);
 
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT')return;
   if(!$('startOv').hidden)return;
   if(e.code==='Space'){e.preventDefault();if(!$('endOv').hidden){hideEnd();loadSection();play();}else togglePlay();}
   else if(e.key==='r'||e.key==='R')restart();
+  else if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();if(!$('endOv').hidden)return;stopForScroll();seekTo(S.clock+(e.key==='ArrowUp'?1:-1),true);}
   else if(e.key==='Enter'&&S.manual){e.preventDefault();manualHit();}
 });
 document.addEventListener('visibilitychange',()=>{if(document.hidden){pause();if(S.phase==='demo'){demoStop();loadSection();}}});
