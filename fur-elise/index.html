@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Für Elise · Piano</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../piano/trainer.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <a class="home" href="../" aria-label="Tous les morceaux">‹</a>
+    <div class="brand"><b>Für <i>Elise</i></b><span>au piano</span></div>
+    <nav class="chips" id="chips" aria-label="Parties du morceau"></nav>
+  </header>
+
+  <section class="stage" id="stage">
+    <canvas id="hw" aria-label="Notes qui tombent sur le clavier"></canvas>
+    <div class="big" id="big"></div>
+    <div class="pop" id="pop"></div>
+    <div class="scrollhint" id="scrollHint">⇅ Glisse pour parcourir</div>
+  </section>
+
+  <section class="controls">
+    <button class="btn primary" id="playBtn" type="button"><span id="playIc"></span><span id="playTx">Jouer</span></button>
+    <button class="btn icon" id="restartBtn" type="button" title="Recommencer (R)" aria-label="Recommencer"></button>
+    <button class="btn" id="listenBtn" type="button"></button>
+    <div class="seg" role="group" aria-label="Main">
+      <button type="button" id="hRight" aria-pressed="true">Main droite</button>
+      <button type="button" id="hLeft" aria-pressed="false">Main gauche</button>
+      <button type="button" id="hBoth" aria-pressed="false">Les deux</button>
+    </div>
+    <button class="btn toggle" id="bassBtn" type="button" aria-pressed="false" title="La main gauche ne joue que les basses (sans les accords)">Basses seules</button>
+    <button class="btn toggle" id="loopBtn" type="button" aria-pressed="false" title="Rejouer en boucle la mesure où tu es"></button>
+    <div class="seg" role="group" aria-label="Mode">
+      <button type="button" id="mWait" aria-pressed="true">Pas à pas</button>
+      <button type="button" id="mRhythm" aria-pressed="false">En rythme</button>
+    </div>
+    <span class="spacer"></span>
+    <div class="speed" role="group" aria-label="Vitesse">
+      <button type="button" id="slower" aria-label="Moins vite">−</button>
+      <output id="speedOut"><b>50 %</b><small>55 BPM</small></output>
+      <button type="button" id="faster" aria-label="Plus vite">+</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="card">
+      <div class="lbl">Joue</div>
+      <div class="note-big" id="tNote">Mi</div>
+      <div class="where" id="tWhere"></div>
+      <div class="next" id="tNext"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">J'entends</div>
+      <div class="row">
+        <div class="heard-note" id="hNote">…</div>
+        <div class="meter" title="Volume du micro"><i id="lvl"></i><u id="gateMark"></u></div>
+      </div>
+      <div class="hint" id="hHint"></div>
+      <label class="sens" for="sens">Sensibilité <input type="range" id="sens" min="1" max="10" step="1" value="6"></label>
+    </div>
+  </section>
+</div>
+
+<div class="overlay" id="startOv">
+  <div class="dialog">
+    <svg class="logo" viewBox="0 0 170 76" aria-hidden="true">
+      <rect x="44" y="4" width="18" height="22" rx="4" fill="#ffc53d"/><rect x="62" y="16" width="18" height="10" rx="4" fill="#ffc53d" opacity=".8"/><rect x="98" y="0" width="18" height="26" rx="4" fill="#3ddc97"/>
+      <g fill="#eef1f6"><rect x="4" y="34" width="21" height="40" rx="2"/><rect x="27" y="34" width="21" height="40" rx="2"/><rect x="50" y="34" width="21" height="40" rx="2"/><rect x="73" y="34" width="21" height="40" rx="2"/><rect x="96" y="34" width="21" height="40" rx="2"/><rect x="119" y="34" width="21" height="40" rx="2"/><rect x="142" y="34" width="21" height="40" rx="2"/></g>
+      <rect x="50" y="34" width="21" height="40" rx="2" fill="#ffc53d"/>
+      <g fill="#11151c"><rect x="19" y="34" width="13" height="24" rx="2"/><rect x="42" y="34" width="13" height="24" rx="2"/><rect x="88" y="34" width="13" height="24" rx="2"/><rect x="111" y="34" width="13" height="24" rx="2"/><rect x="134" y="34" width="13" height="24" rx="2"/></g>
+    </svg>
+    <h1>Für <i>Elise</i></h1>
+    <p>Mets-toi au piano. L'appli t'écoute et avance avec toi.</p>
+    <div class="err" id="startErr" hidden></div>
+    <button class="btn primary" id="goBtn" type="button">Allumer le micro</button>
+    <button class="mini" id="noMicBtn" type="button" hidden>Continuer sans micro</button>
+  </div>
+</div>
+
+<div class="overlay" id="endOv" hidden>
+  <div class="dialog">
+    <div class="lbl" id="endSec">Les Mi</div>
+    <div class="stars" id="endStars"></div>
+    <div class="score" id="endScore"></div>
+    <button class="btn primary" id="endNext" type="button">Partie suivante</button>
+    <div class="btns">
+      <button class="btn" id="endAgain" type="button">Rejouer</button>
+      <button class="btn" id="endFaster" type="button">Plus vite</button>
+    </div>
+  </div>
+</div>
+
+<script src="../piano/trainer.js"></script>
+<script>
+// Für Elise (Beethoven, WoO 59), en la mineur, mesure à 3/8.
+// Unité = la croche ; une double croche = 0,5. Deux notes d'anacrouse (Mi Ré♯) avant la mesure 1.
+PianoTrainer(({N})=>{
+const OFF=1,BAR=3;
+const at=(off,bar,s)=>off+(bar-1)*BAR+s*.5;           // s = double croche n° 0 à 5 dans la mesure
+const six=(off,bar,arr)=>arr.map((m,s)=>N(at(off,bar,s),.5,m));
+// Main gauche : arpège de trois doubles croches au début de chaque mesure (la 3e est tenue).
+const arp=(off,bar,[a,b,c])=>[N(at(off,bar,0),.5,a),N(at(off,bar,1),.5,b),N(at(off,bar,2),1,c)];
+const LA=[45,52,57],MI=[40,52,56],DO=[48,55,60],SOL=[43,55,59];
+// Mesure « une note longue puis trois doubles croches » (le motif La… Do Mi La)
+const tri=(off,bar,long,a,b,c,dur=1)=>[N(at(off,bar,0),dur,long),N(at(off,bar,3),.5,a),N(at(off,bar,4),.5,b),N(at(off,bar,5),.5,c)];
+
+function theme(off,{pickup=true}={}){
+  const rh=[...(pickup?[N(off-1,.5,76),N(off-.5,.5,75)]:[]),
+    ...six(off,1,[76,75,76,71,74,72]), ...tri(off,2,69,60,64,69), ...tri(off,3,71,64,68,71), ...tri(off,4,72,64,76,75),
+    ...six(off,5,[76,75,76,71,74,72]), ...tri(off,6,69,60,64,69), ...tri(off,7,71,64,72,71), N(at(off,8,0),1.5,69)];
+  const lh=[...arp(off,2,LA),...arp(off,3,MI),...arp(off,4,LA),...arp(off,6,LA),...arp(off,7,MI),...arp(off,8,LA)];
+  return {rh,lh};
+}
+// Partie B : 2e fin (La Si Do Ré), puis Mi Sol Fa Mi / Ré Fa Mi Ré / Do Mi Ré Do, et Si qui ramène au thème (Mi Ré♯).
+function suite(off){
+  const rh=[...tri(off,1,69,71,72,74), ...tri(off,2,76,67,77,76,1.5), ...tri(off,3,74,65,76,74,1.5), ...tri(off,4,72,64,74,72,1.5), ...tri(off,5,71,64,76,75)];
+  const lh=[...arp(off,1,LA),...arp(off,2,DO),...arp(off,3,SOL),...arp(off,4,LA),...arp(off,5,MI)];
+  return {rh,lh};
+}
+const t=theme(OFF),s=suite(0);
+// Tout : thème (sans sa 1re fin) → suite → thème complet
+const t1=theme(OFF),cut=at(OFF,8,0),s2=suite(cut),t2=theme(at(OFF,13,0),{pickup:false});
+const PARTS={
+  theme:{name:'Le thème',off:OFF,len:at(OFF,9,0),rh:t.rh,lh:t.lh},
+  suite:{name:'La suite',off:0,len:at(0,6,0),rh:s.rh,lh:s.lh},
+  tout:{name:'Tout le morceau',off:OFF,len:at(OFF,21,0),
+    rh:[...t1.rh.filter(n=>n.beat<cut),...s2.rh,...t2.rh],lh:[...t1.lh.filter(n=>n.beat<cut),...s2.lh,...t2.lh]}
+};
+return {key:'furElise.piano.v1',bpm:130,bar:BAR,start:'theme',order:['theme','suite'],parts:PARTS,
+  // « Basses seules » : la main gauche ne garde que la basse du début de chaque mesure
+  isBass:(n,part)=>Math.abs((((n.beat-(part.off||0))%BAR)+BAR)%BAR)<1e-6};
+});
+</script>
+</body>
+</html>

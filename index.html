@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mes morceaux au piano</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{--ink:#0c0f14;--panel:#171c25;--line:#262d39;--muted:#8b94a5;--text:#eef1f6;--amber:#ffc53d;--lh:#6cb8ff;
+  --f-display:"Rubik",ui-rounded,system-ui,sans-serif;--f-text:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--ink);color:var(--text);font:15px/1.45 var(--f-text);
+  padding-block:max(28px,env(safe-area-inset-top,0px)) max(28px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:640px;margin:0 auto}
+h1{font:800 34px/1.1 var(--f-display);margin:0 0 6px;letter-spacing:-.5px}
+p{color:var(--muted);margin:0 0 24px}
+.list{display:grid;gap:12px}
+a.song{display:flex;align-items:center;gap:16px;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--panel);color:inherit;text-decoration:none}
+a.song:hover,a.song:focus-visible{border-color:var(--amber);outline:none}
+.keys{flex:none;width:56px;height:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:2px}
+.keys i{background:#f2f0ea;border-radius:0 0 3px 3px}
+.keys i.on{background:var(--amber)}.keys i.lh{background:var(--lh)}
+.song b{display:block;font:700 20px/1.2 var(--f-display)}
+.song span{color:var(--muted);font-size:13px}
+.go{margin-left:auto;color:var(--muted);font:700 22px/1 var(--f-display)}
+</style>
+</head>
+<body>
+<main>
+  <h1>Mes morceaux</h1>
+  <p>Choisis un morceau, allume le micro, joue.</p>
+  <div class="list">
+    <a class="song" href="rush-e/"><div class="keys" aria-hidden="true"><i></i><i class="on"></i><i></i><i class="lh"></i></div>
+      <div><b>Rush E</b><span>Sheet Music Boss · version facile</span></div><span class="go">›</span></a>
+    <a class="song" href="fur-elise/"><div class="keys" aria-hidden="true"><i class="lh"></i><i></i><i class="on"></i><i></i></div>
+      <div><b>Für Elise</b><span>Beethoven · le thème et la suite</span></div><span class="go">›</span></a>
+  </div>
+</main>
+</body>
+</html>
